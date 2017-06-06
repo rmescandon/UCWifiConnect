@@ -22,8 +22,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
-	"time"
+	"sync"
 
 	"github.com/CanonicalLtd/UCWifiConnect/netman"
 	"github.com/CanonicalLtd/UCWifiConnect/server"
@@ -71,6 +72,19 @@ func checkSudo() bool {
 		return false
 	}
 	return true
+}
+
+func waitForCtrlC() {
+    var endWaiter sync.WaitGroup
+    endWaiter.Add(1)
+    var signalChannel chan os.Signal
+    signalChannel = make(chan os.Signal, 1)
+    signal.Notify(signalChannel, os.Interrupt)
+    go func() {
+        <-signalChannel
+        endWaiter.Done()
+    }()
+    endWaiter.Wait()
 }
 
 func main() {
@@ -228,46 +242,27 @@ func main() {
 		c.ConnectAp(ssid, pw, ap2device, ssid2ap)
 	case "server":
 		// example -> wifi-connect server operational down
-		if len(args) < 3 {
-			fmt.Println("Error. You need to provide [server-type] [operation] additional params, like 'server management up'")
+		if len(args) < 2 {
+			fmt.Println(`Error. You need to provide server type additional params, like 
+				'server management' or 'server operational' to start one or the other`)
 			return
 		}
 		if args[1] != "management" && args[1] != "operational" {
-			fmt.Println("Error. server-type param should be 'management' or 'operational'")
+			fmt.Println("Error. server type param should be 'management' or 'operational'")
 			return
 		}
-		if args[2] != "up" && args[2] != "down" {
-			fmt.Println("Error. operation param should be 'up' or 'down'")
-			return
-		}
-
 		if args[1] == "management" {
-			if args[2] == "up" {
-				if err := server.StartManagementServer(); err != nil {
-					fmt.Printf("Could not start management server: %v\n", err)
-					return
-				}
-			} else {
-				if err := server.ShutdownManagementServer(); err != nil {
-					fmt.Printf("Could not stop management server: %v\n", err)
-					return
-				}
+			if err := server.StartManagementServer(); err != nil {
+				fmt.Printf("Could not start management server: %v\n", err)
+				return
 			}
 		} else {
-			if args[2] == "up" {
-				if err := server.StartOperationalServer(); err != nil {
-					fmt.Printf("Could not start operational server: %v\n", err)
-					return
-				}
-			} else {
-				if err := server.ShutdownOperationalServer(); err != nil {
-					fmt.Printf("Could not stop operational server: %v\n", err)
-					return
-				}
+			if err := server.StartOperationalServer(); err != nil {
+				fmt.Printf("Could not start operational server: %v\n", err)
+				return
 			}
 		}
-		//TODO TRACE
-		time.Sleep(60 * time.Second)
+		waitForCtrlC()
 	case "management-up":
 		http.ListenAndServe(":8081", handler())
 	default:
