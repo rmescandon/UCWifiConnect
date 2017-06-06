@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/CanonicalLtd/UCWifiConnect/netman"
 	"github.com/CanonicalLtd/UCWifiConnect/server"
@@ -225,6 +226,48 @@ func main() {
 		pw, _ := reader.ReadString('\n')
 		pw = strings.TrimSpace(pw)
 		c.ConnectAp(ssid, pw, ap2device, ssid2ap)
+	case "server":
+		// example -> wifi-connect server operational down
+		if len(args) < 3 {
+			fmt.Println("Error. You need to provide [server-type] [operation] additional params, like 'server management up'")
+			return
+		}
+		if args[1] != "management" && args[1] != "operational" {
+			fmt.Println("Error. server-type param should be 'management' or 'operational'")
+			return
+		}
+		if args[2] != "up" && args[2] != "down" {
+			fmt.Println("Error. operation param should be 'up' or 'down'")
+			return
+		}
+
+		if args[1] == "management" {
+			if args[2] == "up" {
+				if err := server.StartManagementServer(); err != nil {
+					fmt.Printf("Could not start management server: %v\n", err)
+					return
+				}
+			} else {
+				if err := server.ShutdownManagementServer(); err != nil {
+					fmt.Printf("Could not stop management server: %v\n", err)
+					return
+				}
+			}
+		} else {
+			if args[2] == "up" {
+				if err := server.StartOperationalServer(); err != nil {
+					fmt.Printf("Could not start operational server: %v\n", err)
+					return
+				}
+			} else {
+				if err := server.ShutdownOperationalServer(); err != nil {
+					fmt.Printf("Could not stop operational server: %v\n", err)
+					return
+				}
+			}
+		}
+		//TODO TRACE
+		time.Sleep(60 * time.Second)
 	case "management-up":
 		http.ListenAndServe(":8081", handler())
 	default:
